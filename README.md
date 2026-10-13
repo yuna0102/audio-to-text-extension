@@ -15,12 +15,16 @@
    - Repository: `yuna0102/audio-to-text-extension`
    - Branch: 이 코드가 있는 브랜치
    - Main file path: `app.py`
-3. **Advanced settings**에서 Python `3.12`를 고르고, Secrets에 아래 내용을 넣습니다 (`.streamlit/secrets.toml.example` 참고).
-   ```toml
-   ANTHROPIC_API_KEY = "sk-ant-..."
-   APP_PASSWORD = "원하는-비밀번호"   # 선택. 공개 URL에서 내 API 키를 남이 쓰지 못하게 막음
-   ```
+3. **Advanced settings**에서 Python `3.12`를 고릅니다.
 4. **Deploy**를 누르면 `https://<이름>.streamlit.app` 주소가 생깁니다.
+
+API 키 없이도 동작합니다. 이때는 전사만 하고, 요약 탭에 claude.ai 새 채팅에 그대로 붙여넣을 프롬프트를 보여줍니다.
+나중에 자동 요약을 켜려면 앱 설정 → Secrets에 아래를 넣으세요 (`.streamlit/secrets.toml.example` 참고).
+
+```toml
+ANTHROPIC_API_KEY = "sk-ant-..."   # https://console.anthropic.com → API Keys
+APP_PASSWORD = "원하는-비밀번호"     # 선택. 공개 URL에서 내 API 키를 남이 쓰지 못하게 막음
+```
 
 > 무료 서버는 CPU만 있고 메모리가 작습니다. 전사 모델은 `small`(기본)을 권장하고, `medium` 이상은 메모리 부족으로 앱이 재시작될 수 있습니다. 첫 분석 때는 모델 다운로드로 1~2분이 더 걸립니다.
 
@@ -46,6 +50,7 @@ streamlit run app.py
 
 ## API 키
 
+- 키가 없으면 전사 + claude.ai용 요약 프롬프트를 제공합니다.
 - 서버에 `ANTHROPIC_API_KEY`(환경변수 또는 Streamlit Secrets)를 설정하면 사용자는 키 없이 쓸 수 있습니다. 서버 키는 브라우저로 전달되지 않습니다.
 - 사이드바에 키를 입력하면 그 키가 우선 사용됩니다.
 

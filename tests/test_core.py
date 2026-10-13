@@ -53,3 +53,8 @@ def test_stream_summary_passes_prompt_and_yields_text():
 def test_build_report():
     r = core.build_report("meeting", 65, "## 요약", "[00:00] hi", datetime(2026, 1, 2, 3, 4))
     assert r.startswith("# meeting\n") and "2026-01-02 03:04" in r and "01:05" in r and r.endswith("[00:00] hi\n")
+
+
+def test_build_chat_prompt_contains_instructions_and_transcript():
+    p = core.build_chat_prompt("[00:00] 안녕", "회의", "")
+    assert p.startswith(core.SYSTEM_PROMPT) and "## 액션 아이템" in p and p.endswith("[00:00] 안녕")

@@ -37,6 +37,7 @@ with sync_playwright() as p:
 
     errors = [e.inner_text() for e in page.locator("[data-testid='stAlertContentError']").all()]
     summary = page.locator("[data-testid='stTabs'] [data-testid='stMarkdown']").all_inner_texts()
+    chat_prompt = page.locator("[data-testid='stTabs'] [data-testid='stCode']").all_inner_texts()
     page.screenshot(path=shot, full_page=True)
 
     page.get_by_role("tab", name="📄 전사문").click()
@@ -45,4 +46,7 @@ with sync_playwright() as p:
     print("=== TRANSCRIPT ===\n" + transcript)
     print("=== SUMMARY ===\n" + "\n".join(summary))
     print("=== ERRORS ===\n" + "\n".join(errors))
+    print("=== CLAUDE.AI PROMPT ===\n" + "\n".join(chat_prompt)[-600:])
     assert transcript.strip(), "전사문이 비어 있음"
+    if not any("## 한 줄 요약" in t for t in summary):  # 자동 요약이 없으면 붙여넣기용 프롬프트가 있어야 함
+        assert any(transcript.splitlines()[0] in t for t in chat_prompt), "claude.ai용 프롬프트가 없음"

@@ -9,7 +9,7 @@ from datetime import datetime
 import anthropic
 import streamlit as st
 
-from core import KINDS, build_report, fmt_ts, load_whisper, stamp, stream_summary, transcribe_file
+from core import KINDS, build_chat_prompt, build_report, fmt_ts, load_whisper, stamp, stream_summary, transcribe_file
 
 AUDIO_TYPES = ["mp3", "m4a", "wav", "mp4", "webm", "ogg", "flac", "aac"]
 LANGUAGES = {"한국어": "ko", "English": "en", "日本語": "ja", "中文": "zh", "자동 감지": None}
@@ -80,9 +80,10 @@ with st.sidebar:
     st.header("설정")
     # 서버 키는 브라우저로 내려보내지 않는다. 입력란은 개인 키를 쓰고 싶을 때만.
     user_key = st.text_input(
-        "Anthropic API Key" + (" (선택)" if server_key else ""),
+        "Anthropic API Key (선택)",
         type="password",
-        help="서버에 키가 설정돼 있으면 비워둬도 됩니다." if server_key else "sk-ant-... 형식의 키를 입력하세요.",
+        help="서버에 키가 설정돼 있으면 비워둬도 됩니다." if server_key
+        else "없으면 전사만 하고, claude.ai에 붙여넣을 요약 프롬프트를 만들어줍니다.",
     )
     lang_label = st.selectbox("녹음 언어", list(LANGUAGES), index=0)
     size_label = st.selectbox("전사 모델", list(MODEL_SIZES), index=1)
@@ -96,11 +97,10 @@ uploaded = st.file_uploader("음성/영상 파일 업로드", type=AUDIO_TYPES)
 if uploaded:
     st.audio(uploaded)
 
-if st.button("분석 시작", type="primary", disabled=uploaded is None):
-    if not api_key:
-        st.error("사이드바에 Anthropic API Key를 입력해주세요.")
-        st.stop()
+if not api_key:
+    st.info("API 키 없이 사용 중입니다. 전사는 그대로 되고, 요약은 claude.ai에 붙여넣을 프롬프트로 제공됩니다.")
 
+if st.button("분석 시작", type="primary", disabled=uploaded is None):
     try:
         segments, duration = transcribe(uploaded, MODEL_SIZES[size_label], LANGUAGES[lang_label])
     except Exception as e:  # 손상된 파일, 지원하지 않는 코덱 등
@@ -113,25 +113,26 @@ if st.button("분석 시작", type="primary", disabled=uploaded is None):
     st.session_state["name"] = uploaded.name
     st.session_state["stamped"] = stamp(segments)
     st.session_state["duration"] = duration
+    st.session_state["chat_prompt"] = build_chat_prompt(st.session_state["stamped"], kind, context)
+    st.session_state["summary"] = ""
 
     # 스트리밍 중에만 보여주고, 끝나면 아래 탭에서 한 번만 보이도록 지운다.
-    live = st.empty()
-    try:
-        with live.container():
-            st.subheader("요약 · 인사이트 (생성 중)")
-            client = anthropic.Anthropic(api_key=api_key)
-            st.session_state["summary"] = st.write_stream(
-                stream_summary(client, st.session_state["stamped"], kind, context)
-            )
-        live.empty()
-    except anthropic.AuthenticationError:
-        live.empty()
-        st.session_state["summary"] = ""
-        st.error("Anthropic API 키가 올바르지 않습니다. 키를 확인해주세요. (전사문은 아래에서 확인할 수 있습니다)")
-    except anthropic.APIError as e:
-        live.empty()
-        st.session_state["summary"] = ""
-        st.error(f"요약 중 오류가 발생했습니다: {e}")
+    if api_key:
+        live = st.empty()
+        try:
+            with live.container():
+                st.subheader("요약 · 인사이트 (생성 중)")
+                client = anthropic.Anthropic(api_key=api_key)
+                st.session_state["summary"] = st.write_stream(
+                    stream_summary(client, st.session_state["stamped"], kind, context)
+                )
+            live.empty()
+        except anthropic.AuthenticationError:
+            live.empty()
+            st.error("Anthropic API 키가 올바르지 않습니다. 키를 확인해주세요. (전사문은 아래에서 확인할 수 있습니다)")
+        except anthropic.APIError as e:
+            live.empty()
+            st.error(f"요약 중 오류가 발생했습니다: {e}")
 
 if "stamped" in st.session_state:
     summary = st.session_state.get("summary", "")
@@ -140,7 +141,11 @@ if "stamped" in st.session_state:
         if summary:
             st.markdown(summary)
         else:
-            st.info("요약이 없습니다. 다시 실행해주세요.")
+            st.info(
+                "자동 요약이 없습니다. 아래 프롬프트를 복사(오른쪽 위 복사 아이콘)해서 "
+                "[claude.ai](https://claude.ai) 새 채팅에 붙여넣으면 같은 형식의 요약 · 인사이트를 받을 수 있습니다."
+            )
+            st.code(st.session_state["chat_prompt"], language=None, wrap_lines=True, height=300)
     with tab2:
         st.text_area("타임스탬프 포함", st.session_state["stamped"], height=400)
 

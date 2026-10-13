@@ -74,6 +74,11 @@ def build_user_prompt(transcript: str, kind: str, context: str) -> str:
     return user + f"\n[전사문]\n{transcript}"
 
 
+def build_chat_prompt(transcript: str, kind: str, context: str) -> str:
+    """API 키 없이 claude.ai 채팅에 그대로 붙여넣을 수 있는 한 덩어리 프롬프트."""
+    return SYSTEM_PROMPT + "\n---\n\n" + build_user_prompt(transcript, kind, context)
+
+
 def stream_summary(client, transcript: str, kind: str, context: str) -> Iterator[str]:
     with client.messages.stream(
         model=CLAUDE_MODEL,
