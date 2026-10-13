@@ -33,6 +33,17 @@ jobs:
           espeak-ng -v en -s 150 -w out/en.wav "Good morning everyone. Let's start the weekly product meeting. The checkout redesign will be finished by next Friday. Sarah will run five customer interviews this week. We have not decided on the coupon policy yet."
           ffmpeg -loglevel error -y -i out/ko.wav out/ko_meeting.m4a
           ffmpeg -loglevel error -y -i out/en.wav out/en_meeting.mp3
+      - name: Transcribe directly (no UI)
+        timeout-minutes: 10
+        run: |
+          python - <<'PY'
+          import time
+          from core import load_whisper, transcribe_file, stamp
+          t = time.time(); m = load_whisper("small"); print(f"model loaded in {time.time()-t:.1f}s", flush=True)
+          for f, lang in [("out/en_meeting.mp3", "en"), ("out/ko_meeting.m4a", "ko")]:
+              t = time.time(); segs, info = transcribe_file(m, f, lang)
+              print(f"--- {f} ({info.duration:.1f}s audio, {time.time()-t:.1f}s)\n{stamp(segs)}", flush=True)
+          PY
       - name: Start app
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY || 'sk-ant-invalid-ci-key' }}
@@ -43,6 +54,9 @@ jobs:
         run: python tests/e2e_browser.py out/en_meeting.mp3 English out/e2e_en.png
       - name: E2E in browser (Korean, m4a)
         run: python tests/e2e_browser.py out/ko_meeting.m4a 한국어 out/e2e_ko.png
+      - name: Streamlit log
+        if: always()
+        run: tail -100 out/streamlit.log || true
       - uses: actions/upload-artifact@v4
         if: always()
         with:

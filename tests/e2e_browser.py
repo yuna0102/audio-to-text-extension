@@ -24,7 +24,12 @@ with sync_playwright() as p:
     page.get_by_role("button", name="분석 시작").click()
 
     # 모델 다운로드 + 전사 + 요약까지 넉넉히 기다린다
-    page.get_by_role("tab", name="📄 전사문").wait_for(timeout=600_000)
+    try:
+        page.get_by_role("tab", name="📄 전사문").wait_for(timeout=600_000)
+    except Exception:
+        page.screenshot(path=shot, full_page=True)
+        print("=== PAGE TEXT AT TIMEOUT ===\n" + page.locator("body").inner_text())
+        raise
     page.wait_for_timeout(1000)
 
     errors = [e.inner_text() for e in page.locator("[data-testid='stAlertContentError']").all()]
