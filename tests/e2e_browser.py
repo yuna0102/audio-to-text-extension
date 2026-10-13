@@ -25,7 +25,10 @@ with sync_playwright() as p:
 
     # 모델 다운로드 + 전사 + 요약까지 넉넉히 기다린다
     try:
-        page.get_by_role("tab", name="📄 전사문").wait_for(timeout=600_000)
+        done = page.get_by_role("tab", name="📄 전사문")
+        failed = page.get_by_text("전사 중 오류가 발생했습니다")
+        done.or_(failed).first.wait_for(timeout=600_000)
+        assert not failed.count(), failed.inner_text()
     except Exception:
         page.screenshot(path=shot, full_page=True)
         print("=== PAGE TEXT AT TIMEOUT ===\n" + page.locator("body").inner_text())
