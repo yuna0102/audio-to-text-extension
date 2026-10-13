@@ -1,0 +1,50 @@
+name: test
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install
+        run: |
+          sudo apt-get update && sudo apt-get install -y espeak-ng ffmpeg
+          pip install -r requirements-dev.txt
+          python -m playwright install --with-deps chromium
+      - name: Unit / app tests
+        run: pytest -q tests
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: whisper-small
+      - name: Make test recordings (TTS)
+        run: |
+          mkdir -p out
+          espeak-ng -v ko -s 140 -w out/ko.wav "안녕하세요. 오늘은 커머스 기능 주간회의를 시작하겠습니다. 결제 페이지 개편은 다음 주 금요일까지 민수 님이 마무리하기로 했습니다. 장바구니 이탈률이 지난달보다 늘어서 원인을 분석해야 합니다. 쿠폰 정책은 아직 결정하지 못했고 다음 회의에서 다시 논의하겠습니다."
+          espeak-ng -v en -s 150 -w out/en.wav "Good morning everyone. Let's start the weekly product meeting. The checkout redesign will be finished by next Friday. Sarah will run five customer interviews this week. We have not decided on the coupon policy yet."
+          ffmpeg -loglevel error -y -i out/ko.wav out/ko_meeting.m4a
+          ffmpeg -loglevel error -y -i out/en.wav out/en_meeting.mp3
+      - name: Start app
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY || 'sk-ant-invalid-ci-key' }}
+        run: |
+          nohup streamlit run app.py --server.headless true > out/streamlit.log 2>&1 &
+          for i in $(seq 30); do curl -sf http://localhost:8501/_stcore/health && break; sleep 2; done
+      - name: E2E in browser (English, mp3)
+        run: python tests/e2e_browser.py out/en_meeting.mp3 English out/e2e_en.png
+      - name: E2E in browser (Korean, m4a)
+        run: python tests/e2e_browser.py out/ko_meeting.m4a 한국어 out/e2e_ko.png
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-results
+          path: out/
